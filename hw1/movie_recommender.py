@@ -1,9 +1,118 @@
 from collections import defaultdict
 
-def main():
-    pass
 
-from collections import defaultdict
+# ===============================================================
+#                 CLI: Movie Recommender System
+# ===============================================================
+def main():
+    movie_to_genre = {}
+    genre_to_movies = defaultdict(set)
+
+    movie_ratings = defaultdict(list)
+    user_ratings = defaultdict(list)
+
+    movies_loaded = False
+    ratings_loaded = False
+
+    while True:
+        print("\n===== Movie Recommender Menu =====")
+        print("1) Load movies text file")
+        print("2) Load ratings text file")
+        print("3) Feature 1: Top N movies (overall)")
+        print("4) Feature 2: Top N movies (in genre)")
+        print("5) Test each function (Features 1–5)")
+        print("6) Exit")
+
+        choice = input("Enter choice: ").strip()
+
+        if choice == "1":
+            path = input("Enter movies file path: ").strip()
+            movie_to_genre, genre_to_movies = load_movies(path)
+            movies_loaded = True
+            print(f"Loaded {len(movie_to_genre)} movies and {len(genre_to_movies)} genres.")
+
+        elif choice == "2":
+            path = input("Enter ratings file path: ").strip()
+            movie_ratings, user_ratings = load_ratings(path)
+            ratings_loaded = True
+            print(f"Loaded ratings for {len(movie_ratings)} movies and {len(user_ratings)} users.")
+
+        elif choice == "3":
+            if not ratings_loaded:
+                print("Load ratings first (option 2).")
+                continue
+            try:
+                n = int(input("Enter N: ").strip())
+                if n <= 0:
+                    print("N must be a positive integer.")
+                    continue
+            except ValueError:
+                print("Invalid input. Please enter an integer.")
+                continue
+
+            top_n_movies_overall(n, movie_ratings)
+
+
+        elif choice == "4":
+            if not movies_loaded:
+                print("Load movies first (option 1).")
+                continue
+            if not ratings_loaded:
+                print("Load ratings first (option 2).")
+                continue
+            genre = input("Enter genre (case-sensitive): ").strip()
+
+            try:
+                n = int(input("Enter N: ").strip())
+                if n <= 0:
+                    print("N must be a positive integer.")
+                    continue
+            except ValueError:
+                print("Invalid input. Please enter an integer.")
+                continue
+            top_n_movies_in_genre(n, genre, genre_to_movies, movie_ratings)
+
+        elif choice == "5":
+            # Basic "test each function" menu action
+            if not movies_loaded or not ratings_loaded:
+                print("Load BOTH movies and ratings first (options 1 and 2).")
+                continue
+
+            print("\n--- Running Feature 1 sample ---")
+            top_n_movies_overall(5, movie_ratings)
+
+            print("\n--- Running Feature 2 sample ---")
+            # pick first available genre to demo
+            if genre_to_movies:
+                sample_genre = next(iter(genre_to_movies.keys()))
+                top_n_movies_in_genre(5, sample_genre, genre_to_movies, movie_ratings)
+            else:
+                print("No genres loaded.")
+
+            print("\n--- Running Feature 3 sample ---")
+            top_n_genres(3, movie_to_genre, genre_to_movies, movie_ratings)
+
+            print("\n--- Running Feature 4 sample ---")
+            if user_ratings:
+                sample_user = next(iter(user_ratings.keys()))
+                user_top_genre(sample_user, user_ratings, movie_to_genre)
+            else:
+                print("No users loaded.")
+
+            print("\n--- Running Feature 5 sample ---")
+            if user_ratings:
+                sample_user = next(iter(user_ratings.keys()))
+                recommend_top_3(sample_user, user_ratings, movie_to_genre, genre_to_movies, movie_ratings)
+            else:
+                print("No users loaded.")
+
+        elif choice == "6":
+            print("Goodbye!")
+            break
+
+        else:
+            print("Invalid choice. Try again.")
+
 
 def load_movies(movie_file):
     """
@@ -136,8 +245,78 @@ def compute_genre_average_of_averages(movie_avg, movie_to_genre):
     }
 
 
+
+
+# ===============================================================
+#                           FEATURES
+# ===============================================================
+
+
 # ================================================================
-# 1) Top n genres with highest average of average movie ratings
+# 1) Movie popularity based on average rating.
+# ================================================================
+
+def top_n_movies_overall(n, movie_ratings):
+    """
+    Feature 1: Top n movies ranked on average rating.
+    Prints and returns list of tuples: [(movie_name, avg_rating, num_ratings), ...]
+    """
+    averages = []
+    for movie, ratings in movie_ratings.items():
+        if ratings:  # avoid divide by zero
+            avg = sum(ratings) / len(ratings)
+            averages.append((movie, avg, len(ratings)))
+
+    # sort by avg desc, then by number of ratings desc, then name asc
+    averages.sort(key=lambda x: (-x[1], -x[2], x[0]))
+
+    print(f"\nTop {n} Movies by Average Rating")
+    print("-" * 50)
+    for i, (movie, avg, count) in enumerate(averages[:n], start=1):
+        print(f"{i}. {movie:<30}  Avg: {avg:.2f}  Count: {count}")
+    print()
+
+    return averages[:n]
+
+
+# ================================================================
+# 2) Top n movies in a genre ranked on average rating.
+# ================================================================
+
+def top_n_movies_in_genre(n, genre, genre_to_movies, movie_ratings):
+    """
+    Feature 2: Top n movies in a genre ranked on average rating.
+    Prints and returns list of tuples: [(movie_name, avg_rating, num_ratings), ...]
+    """
+    genre = genre.strip()
+
+    if genre not in genre_to_movies:
+        print(f"\nGenre '{genre}' not found.\n")
+        return []
+
+    candidates = []
+    for movie in genre_to_movies[genre]:
+        if movie in movie_ratings and movie_ratings[movie]:
+            ratings = movie_ratings[movie]
+            avg = sum(ratings) / len(ratings)
+            candidates.append((movie, avg, len(ratings)))
+
+    candidates.sort(key=lambda x: (-x[1], -x[2], x[0]))
+
+    print(f"\nTop {n} Movies in Genre: {genre}")
+    print("-" * 50)
+    if not candidates:
+        print("No rated movies found in this genre.\n")
+        return []
+
+    for i, (movie, avg, count) in enumerate(candidates[:n], start=1):
+        print(f"{i}. {movie:<30}  Avg: {avg:.2f}  Count: {count}")
+    print()
+
+    return candidates[:n]
+
+# ================================================================
+# 3) Top n genres with highest average of average movie ratings
 # ================================================================
 
 def top_n_genres(n, movie_to_genre, genre_to_movies, movie_ratings):
@@ -162,7 +341,7 @@ def top_n_genres(n, movie_to_genre, genre_to_movies, movie_ratings):
 
 
 # ================================================================
-# 2) User's highest-rated genre (based on user's ratings only)
+# 4) User's highest-rated genre (based on user's ratings only)
 # ================================================================
 
 def user_top_genre(user_id, user_ratings, movie_to_genre):
@@ -199,7 +378,7 @@ def user_top_genre(user_id, user_ratings, movie_to_genre):
 
 
 # ================================================================
-# 3) Top 3 unrated movies from user's top genre
+# 5) Top 3 unrated movies from user's top genre
 # ================================================================
 
 def recommend_top_3(user_id, user_ratings, movie_to_genre,
