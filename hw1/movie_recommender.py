@@ -146,6 +146,9 @@ def load_movies(movie_file):
                 print(f"Warning (movies.txt line {line_number}): "
                       f"Missing genre or movie name → {line}")
                 continue
+            
+            genre = genre.lower()
+            movie_name = movie_name.lower()
 
             # Check for duplicate movie definitions
             if movie_name in movie_to_genre:
@@ -185,6 +188,8 @@ def load_ratings(rating_file):
                 continue
 
             movie_name, rating_str, user_id_str = [p.strip() for p in parts]
+
+            movie_name = movie_name.lower()
 
             # Validate rating
             try:
