@@ -290,66 +290,66 @@ if __name__ == "__main__":
 
     # Expected values for Dataset #1
     expected_dataset_one = {
-        "feature1": "Die Hard (1988)",
-        "feature2": "Forrest Gump (1994)",
-        "feature3": "Action",
-        "feature4": "Action",
-        "genre_test": "Drama",
+        "feature1": "die hard (1988)",
+        "feature2": "forrest gump (1994)",
+        "feature3": "action",
+        "feature4": "action",
+        "genre_test": "drama",
         "user_test": 101,
         "n_value": 1
     }
 
     # Expected values for Dataset #2
     expected_dataset_two = {
-        "feature1": "The Dark Knight (2008)",
-        "feature2": "Interstellar (2014)",
-        "feature3": "Action",
-        "feature4": "Action",
-        "genre_test": "Sci-Fi",
+        "feature1": "the dark knight (2008)",
+        "feature2": "interstellar (2014)",
+        "feature3": "action",
+        "feature4": "action",
+        "genre_test": "sci-fi",
         "user_test": 201,
         "n_value": 2
     }
 
     # Expected values for Dataset #3
     expected_dataset_three = {
-        "feature1": "Mad Max (1979)",
-        "feature2": "Mad Max (1979)",
-        "feature3": "Action",
-        "feature4": "Action",
-        "genre_test": "Action",
+        "feature1": "mad max (1979)",
+        "feature2": "mad max (1979)",
+        "feature3": "action",
+        "feature4": "action",
+        "genre_test": "action",
         "user_test": 101,
         "n_value": 2
     }
 
     # Expected values for Dataset #4
     expected_dataset_four = {
-        "feature1": "Avatar (2009)",
-        "feature2": "Avatar (2009)",
-        "feature3": "Action",
-        "feature4": "Action",
-        "genre_test": "Action",
+        "feature1": "avatar (2009)",
+        "feature2": "avatar (2009)",
+        "feature3": "action",
+        "feature4": "action",
+        "genre_test": "action",
         "user_test": 1,
         "n_value": 2
     }
 
     # Expected values for Dataset #5
     expected_dataset_five= {
-        "feature1": "Inception (2010)",
-        "feature2": "Inception (2010)",
-        "feature3": "Sci-Fi",
-        "feature4": "Sci-Fi",
-        "genre_test": "Sci-Fi",
+        "feature1": "inception (2010)",
+        "feature2": "inception (2010)",
+        "feature3": "sci-fi",
+        "feature4": "sci-fi",
+        "genre_test": "sci-fi",
         "user_test": 300,
         "n_value": 3
     }
 
     # Expected values for Dataset #6
     expected_dataset_six= {
-        "feature1": "Forrest Gump (1994)",
-        "feature2": "Mad Max (1979)",
-        "feature3": "Drama",
-        "feature4": "Action",
-        "genre_test": "Action",
+        "feature1": "forrest gump (1994)",
+        "feature2": "mad max (1979)",
+        "feature3": "drama",
+        "feature4": "action",
+        "genre_test": "action",
         "user_test": 101,
         "n_value": 5
     }
