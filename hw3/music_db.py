@@ -1,3 +1,4 @@
+from mysql.connector import connect, Error
 from typing import Tuple, List, Set
 
 def clear_database(mydb):
