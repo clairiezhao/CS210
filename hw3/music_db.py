@@ -10,9 +10,16 @@ def clear_database(mydb):
     Args:
         mydb: database connection
     """
-    pass
+    cursor = mydb.cursor()
+    tables = ["song_genre", "album_genre", "genre", "rating", "user", "song", "album", "artist"]
+    cursor.execute("set foreign_key_checks = 0")
+    mydb.commit()
+    for table in tables:
+        cursor.execute(f"truncate table {table}")
+    cursor.execute("set foreign_key_checks = 1") 
+    mydb.commit()
     
-def load_single_songs(mydb, single_songs: List[Tuple[str,Tuple[str...],str,str]]) -> Set[Tuple[str,str]]:
+def load_single_songs(mydb, single_songs: List[Tuple[str,Tuple[str, ...],str,str]]) -> Set[Tuple[str,str]]:
     """
     Add single songs to the database. 
 
@@ -31,7 +38,61 @@ def load_single_songs(mydb, single_songs: List[Tuple[str,Tuple[str...],str,str]]
         in the database and were not added (rejected). 
         Set is empty if there are no rejects.
     """
-    pass
+    cursor = mydb.cursor()
+    not_added = set()
+    add_artist = "insert into artist (name) values (%s)"
+    add_song = "insert into song (title, release_date, artist_id) values (%s, %s, %s)"
+    add_song_genre = "insert into song_genre values (%s, %s)"
+    add_genre = "insert into genre (name) values (%s)"
+
+    song_exists = '''
+    select count(*) from song, artist
+    where song.title = (%s)
+    and artist.name = (%s)
+    and song.artist_id = artist.id
+    '''
+    get_artist_id = "select id from artist where name = (%s)"
+    get_genre_id = "select id from genre where name = (%s)"
+
+    for song in single_songs:
+        title = song[0]
+        genres = song[1]
+        artist = song[2]
+        date = song[3]
+        # Check if the combination (song, artist) exists in song table
+        cursor.execute(song_exists, (title, artist))
+        if cursor.fetchone()[0] == 0:
+            artist_id = 0
+            genre_id = 0
+            # Check if artist exists
+            cursor.execute(get_artist_id, (artist,))
+            res = cursor.fetchone()
+            if not res:
+                # Add artist
+                cursor.execute(add_artist, (artist,))
+                artist_id = cursor.lastrowid
+            else:
+                artist_id = res[0]
+            # Add song
+            cursor.execute(add_song, (title, date, artist_id))
+            song_id = cursor.lastrowid
+            # Add to song_genre
+            for genre in genres:
+                # Check if genre exists
+                cursor.execute(get_genre_id, (genre,))
+                res = cursor.fetchone()
+                if not res:
+                    # Add genre
+                    cursor.execute(add_genre, (genre,))
+                    genre_id = cursor.lastrowid
+                else:
+                    genre_id = res[0]
+                cursor.execute(add_song_genre, (song_id, genre_id))
+            mydb.commit()
+        else:
+            not_added.add((title, artist))
+
+    return not_added
 
 def get_most_prolific_individual_artists(mydb, n: int, year_range: Tuple[int,int]) -> List[Tuple[str,int]]:   
     """
@@ -48,7 +109,22 @@ def get_most_prolific_individual_artists(mydb, n: int, year_range: Tuple[int,int
         If there are fewer than n artists, all of them are returned.
         If there are no artists, an empty list is returned.
     """
-    pass
+    cursor = mydb.cursor()
+    top_artists = set()
+    query = '''select name, count(*) as songs from artist, song
+    where song.album_id is null
+    where year(release_date) between (%s) and (%s)
+    and song.artist_id = artist.id
+    group by artist.id
+    order by artist.id desc
+    limit (%s)'''
+    cursor.execute(query, (year_range[0], year_range[1], n))
+    res = cursor.fetchall()
+    for row in res:
+        top_artists.add(row)
+        print(row)
+    return top_artists
+
 
 def get_artists_last_single_in_year(mydb, year: int) -> Set[str]:
     """
@@ -62,7 +138,19 @@ def get_artists_last_single_in_year(mydb, year: int) -> Set[str]:
         Set[str]: set of artist names
         If there is no artist with a single released in the given year, an empty set is returned.
     """
-    pass
+    cursor = mydb.cursor()
+    top_artists = set()
+    query = '''select name, count(*) as songs from artist, song
+    where song.album_id is null
+    and year(release_date) = (%s)
+    and song.artist_id = artist.id
+    group by artist.id
+    order by artist.id desc'''
+    cursor.execute(query, (year,))
+    res = cursor.fetchall()
+    for row in res:
+        top_artists.add(row[0])
+    return top_artists
     
 def load_albums(mydb, albums: List[Tuple[str,str,str,str,List[str]]]) -> Set[Tuple[str,str]]:
     """
@@ -182,7 +270,35 @@ def get_most_engaged_users(mydb, year_range: Tuple[int,int], n: int) -> List[Tup
     pass
 
 def main():
-    pass
+    try:
+        mydb = connect(unix_socket='/run/mysqld/mysqld.sock', database='cxz7_music_db')
+        singles = [
+        ("Old Town Road", ("Country Rap", "Trap"), "Lil Nas X", "2018-12-03"),
+        ("Sunflower", ("Hip Hop", "Pop Rap"), "Post Malone", "2018-10-18"),
+        ("Sucker", ("Pop Rock", "Pop"), "Jonas Brothers", "2019-03-01"),
+        ("Thank U, Next", ("Pop", "R&B"), "Ariana Grande", "2018-11-03"),
+        ("Bad Guy", ("Pop", "Electropop"), "Billie Eilish", "2019-03-29"),
+        ("Uptown Funk", ("Funk", "Pop"), "Mark Ronson", "2014-11-10"),
+        ("Shallow", ("Pop", "Soundtrack"), "Lady Gaga", "2018-09-27"),
+        ("This Is America", ("Hip Hop", "Gospel"), "Childish Gambino", "2018-05-05"),
+        ("Happy", ("Pop", "Soul"), "Pharrell Williams", "2013-11-21"),
+        ("We Are Never Ever Getting Back Together", ("Pop", "Country Pop"), "Taylor Swift", "2012-08-13"),
+        ("Royals", ("Indie Pop", "Electropop"), "Lorde", "2013-03-08"),
+        ("Counting Stars", ("Pop Rock", "Folk Pop"), "OneRepublic", "2013-06-14"),
+        ("Despacito", ("Reggaeton", "Latin Pop"), "Luis Fonsi", "2017-01-13"),
+        ("Blinding Lights", ("Synthwave", "Pop"), "The Weeknd", "2019-11-29"),
+        ("Drivers License", ("Pop", "Indie Pop"), "Olivia Rodrigo", "2021-01-08")
+        ]
+        not_added = load_single_songs(mydb, singles)
+        print(not_added)
+        artists = get_most_prolific_individual_artists(mydb, (2018, 2020))
+        print(artists)
+        artists = get_artists_last_single_in_year(mydb, 2018)
+        print(artists)
+        
+    except Error as e:
+        print(e)
+    
 
 if __name__ == "__main__":
     main()
