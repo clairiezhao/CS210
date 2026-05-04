@@ -169,7 +169,78 @@ def load_albums(mydb, albums: List[Tuple[str,str,str,str,List[str]]]) -> Set[Tup
         because the artist already has an album of the same title.
         Set is empty if there are no rejects.
     """
-    pass
+    already_exists = set()
+    cursor = mydb.cursor()
+
+    for album_title, genre, artist_name, release_date, song_titles in albums:
+        # Check if album exists
+        cursor.execute(
+            "SELECT * FROM album WHERE title = %s AND artist_id = (SELECT id FROM artist WHERE name = %s)",
+            (album_title, artist_name)
+        )
+
+        if cursor.fetchone() is not None:
+            # If album exists, add to set
+            already_exists.add((album_title, artist_name))
+        else:
+            # Check if the artist exists, if not insert to artist table
+            cursor.execute(
+                "SELECT id FROM artist WHERE name = %s", (artist_name,)
+            )
+            artist_row = cursor.fetchone()
+
+            if artist_row is None:
+                cursor.execute(
+                    "INSERT INTO artist(name) VALUES(%s)", (artist_name,)
+                )
+                artist_id = cursor.lastrowid
+            else:
+                artist_id = artist_row[0]
+
+            # Check if genre exists, if not insert to genre table
+            cursor.execute(
+                "SELECT id FROM genre WHERE name = %s", (genre,)
+            )
+            genre_row = cursor.fetchone()
+
+            if genre_row is None:
+                cursor.execute(
+                    "INSERT INTO genre(name) VALUES(%s)", (genre,)
+                )
+                genre_id = cursor.lastrowid
+            else:
+                genre_id = genre_row[0]
+
+            # Insert album into the album table
+            cursor.execute(
+                "INSERT INTO album(title, artist_id, release_date) VALUES(%s, %s, %s)",
+                (album_title, artist_id, release_date)
+            )
+
+            album_id = cursor.lastrowid
+
+            # Insert each song related to the album
+            for song_title in song_titles:
+                cursor.execute(
+                    "SELECT * FROM song WHERE title = %s AND artist_id = %s",
+                    (song_title, artist_id)
+                )
+                if cursor.fetchone() is None:
+                    cursor.execute(
+                        "INSERT INTO song(title, artist_id, album_id, release_date) VALUES(%s, %s, %s, %s)",
+                        (song_title, artist_id, album_id, release_date)
+                    )
+
+                    song_id = cursor.lastrowid
+                    cursor.execute(
+                        "INSERT INTO song_genre(song_id, genre_id) VALUES(%s, %s)",
+                        (song_id, genre_id)
+                    )
+
+    mydb.commit()
+    cursor.close()
+    return already_exists
+
 
 def get_top_song_genres(mydb, n: int) -> List[Tuple[str,int]]:
     """
@@ -185,6 +256,25 @@ def get_top_song_genres(mydb, n: int) -> List[Tuple[str,int]]:
         least represented genre. If number of genres is less than n, returns all.
         Ties broken by alphabetical order of genre names.
     """
+    cursor = mydb.cursor()
+
+    cursor.execute(
+        """
+        SELECT genre.name, COUNT(song.id) AS song_count
+        FROM song_genre
+        JOIN genre ON song_genre.genre_id = genre.id
+        JOIN song ON song.id = song_genre.song_id
+        GROUP BY genre.name
+        ORDER BY song_count DESC, genre.name ASC
+        LIMIT %s
+        """,
+        (n,)
+    )
+
+    genres = cursor.fetchall()
+    cursor.close()
+    return genres
+    
 
 def get_album_and_single_artists(mydb) -> Set[str]:
     """
@@ -222,7 +312,32 @@ def load_users(mydb, users: List[str]) -> Set[str]:
         they are duplicates of existing users.
         Set is empty if there are no rejects.
     """
-    pass
+    already_exists = set()
+    cursor = mydb.cursor()
+
+    for username in users:
+        # Check if user exists
+        cursor.execute(
+            "SELECT * FROM user WHERE name = %s",
+            (username,)
+        )
+
+        result = cursor.fetchone()
+
+        if result is not None:
+            # If user exists, add to set
+            already_exists.add(username)
+        else:
+            # If not, insert user to user table
+            cursor.execute(
+                "INSERT INTO user(name) VALUES(%s)",
+                (username,)
+            )
+
+    mydb.commit()
+    cursor.close()
+    return already_exists
+    
 
 def load_song_ratings(mydb, song_ratings: List[Tuple[str,Tuple[str,str],int, str]]) -> Set[Tuple[str,str,str]]:
     """
@@ -246,7 +361,54 @@ def load_song_ratings(mydb, song_ratings: List[Tuple[str,Tuple[str,str],int, str
         
         An empty set is returned if there are no rejects.  
     """
-    pass
+    already_exists = set()  
+    cursor = mydb.cursor()
+
+    for rater, (artist_name, song_title), rating, date in song_ratings:
+        # Check if the user (rater) exists, if not add to set
+        cursor.execute("SELECT id FROM user WHERE name = %s", (rater,))
+        user_row = cursor.fetchone()
+        if user_row is None:
+            already_exists.add((rater, artist_name, song_title))  
+            continue
+            
+        # Check if (artist, song) combination exists, if not add to set
+        cursor.execute(
+            "SELECT id FROM song WHERE title = %s AND artist_id = (SELECT id FROM artist WHERE name = %s)",
+            (song_title, artist_name)
+        )
+        song_row = cursor.fetchone()
+
+        if song_row is None:
+            already_exists.add((rater, artist_name, song_title))  
+            continue
+
+        # Check if rating is within valid range (1 to 5), if not add to set
+        if not (1 <= rating <= 5):
+            already_exists.add((rater, artist_name, song_title)) 
+            continue
+
+        # Check if user has already rated this song, if has add to set
+        cursor.execute(
+            "SELECT * FROM rating WHERE user_id = (SELECT id FROM user WHERE name = %s) AND song_id = %s",
+            (rater, song_row[0])  # song_row[0] is the song ID
+        )
+        existing_rating = cursor.fetchone()
+
+        if existing_rating is not None:
+            already_exists.add((rater, artist_name, song_title))  
+            continue
+
+        # Insert rating into the rating table if everything is valid
+        cursor.execute(
+            "INSERT INTO rating (rating, date, song_id, user_id) VALUES (%s, %s, %s, %s)",
+            (rating, date, song_row[0], user_row[0])  
+        )
+        
+    mydb.commit()  
+    cursor.close()
+    return already_exists  
+    
 
 def get_most_rated_songs(mydb, year_range: Tuple[int,int], n: int) -> List[Tuple[str,str,int]]:
     """
