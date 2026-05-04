@@ -196,6 +196,18 @@ def get_album_and_single_artists(mydb) -> Set[str]:
     Returns:
         Set[str]: set of artist names
     """
+    cursor = mydb.cursor()
+    query = """
+        SELECT DISTINCT a.name
+        FROM artist AS a
+        JOIN album AS al
+            ON al.artist_id = a.id
+        JOIN song AS s
+            ON s.artist_id = a.id
+        WHERE s.album_id IS NULL
+    """
+    cursor.execute(query)
+    return {row[0] for row in cursor.fetchall()}
     
 def load_users(mydb, users: List[str]) -> Set[str]:
     """
@@ -252,7 +264,21 @@ def get_most_rated_songs(mydb, year_range: Tuple[int,int], n: int) -> List[Tuple
     Returns:
         List[Tuple[str,str,int]: list of (song title, artist name, number of ratings for song)   
     """
-    pass
+    cursor = mydb.cursor()
+    query = """
+        SELECT s.title, a.name, COUNT(*) AS num_ratings
+        FROM rating AS r
+        JOIN song AS s
+            ON r.song_id = s.id
+        JOIN artist AS a
+            ON s.artist_id = a.id
+        WHERE YEAR(r.date) BETWEEN %s AND %s
+        GROUP BY s.id, s.title, a.name
+        ORDER BY num_ratings DESC, s.title ASC
+        LIMIT %s
+    """
+    cursor.execute(query, (year_range[0], year_range[1], n))
+    return cursor.fetchall()
 
 def get_most_engaged_users(mydb, year_range: Tuple[int,int], n: int) -> List[Tuple[str,int]]:
     """
@@ -267,7 +293,19 @@ def get_most_engaged_users(mydb, year_range: Tuple[int,int], n: int) -> List[Tup
     Returns:
         List[Tuple[str, int]]: list of (username,number_of_songs_rated) tuples
     """
-    pass
+    cursor = mydb.cursor()
+    query = """
+        SELECT u.name, COUNT(*) AS num_songs_rated
+        FROM rating AS r
+        JOIN `user` AS u
+            ON r.user_id = u.id
+        WHERE YEAR(r.date) BETWEEN %s AND %s
+        GROUP BY u.id, u.name
+        ORDER BY num_songs_rated DESC, u.name ASC
+        LIMIT %s
+    """
+    cursor.execute(query, (year_range[0], year_range[1], n))
+    return cursor.fetchall()
 
 def main():
     try:
