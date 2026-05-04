@@ -129,7 +129,7 @@ CREATE TABLE `rating` (
   `date` date NOT NULL,
   `song_id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
-  KEY `song_id` (`song_id`),
+  UNIQUE KEY `song_id` (`song_id`,`user_id`),
   KEY `user_id` (`user_id`),
   CONSTRAINT `rating_ibfk_1` FOREIGN KEY (`song_id`) REFERENCES `song` (`id`),
   CONSTRAINT `rating_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`),

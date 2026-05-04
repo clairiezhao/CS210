@@ -59,9 +59,10 @@ def load_single_songs(mydb, single_songs: List[Tuple[str,Tuple[str, ...],str,str
         genres = song[1]
         artist = song[2]
         date = song[3]
+        # Ensure song belongs to at least 1 genre
         # Check if the combination (song, artist) exists in song table
         cursor.execute(song_exists, (title, artist))
-        if cursor.fetchone()[0] == 0:
+        if genres and cursor.fetchone()[0] == 0:
             artist_id = 0
             genre_id = 0
             # Check if artist exists
@@ -113,16 +114,15 @@ def get_most_prolific_individual_artists(mydb, n: int, year_range: Tuple[int,int
     top_artists = set()
     query = '''select name, count(*) as songs from artist, song
     where song.album_id is null
-    where year(release_date) between (%s) and (%s)
+    and year(release_date) between (%s) and (%s)
     and song.artist_id = artist.id
     group by artist.id
-    order by artist.id desc
+    order by count(*) desc
     limit (%s)'''
     cursor.execute(query, (year_range[0], year_range[1], n))
     res = cursor.fetchall()
     for row in res:
         top_artists.add(row)
-        print(row)
     return top_artists
 
 
@@ -227,8 +227,8 @@ def load_albums(mydb, albums: List[Tuple[str,str,str,str,List[str]]]) -> Set[Tup
                 )
                 if cursor.fetchone() is None:
                     cursor.execute(
-                        "INSERT INTO song(title, artist_id, album_id, release_date) VALUES(%s, %s, %s, %s)",
-                        (song_title, artist_id, album_id, release_date)
+                        "INSERT INTO song(title, artist_id, album_id) VALUES(%s, %s, %s)",
+                        (song_title, artist_id, album_id)
                     )
 
                     song_id = cursor.lastrowid
@@ -470,34 +470,7 @@ def get_most_engaged_users(mydb, year_range: Tuple[int,int], n: int) -> List[Tup
     return cursor.fetchall()
 
 def main():
-    try:
-        mydb = connect(unix_socket='/run/mysqld/mysqld.sock', database='cxz7_music_db')
-        singles = [
-        ("Old Town Road", ("Country Rap", "Trap"), "Lil Nas X", "2018-12-03"),
-        ("Sunflower", ("Hip Hop", "Pop Rap"), "Post Malone", "2018-10-18"),
-        ("Sucker", ("Pop Rock", "Pop"), "Jonas Brothers", "2019-03-01"),
-        ("Thank U, Next", ("Pop", "R&B"), "Ariana Grande", "2018-11-03"),
-        ("Bad Guy", ("Pop", "Electropop"), "Billie Eilish", "2019-03-29"),
-        ("Uptown Funk", ("Funk", "Pop"), "Mark Ronson", "2014-11-10"),
-        ("Shallow", ("Pop", "Soundtrack"), "Lady Gaga", "2018-09-27"),
-        ("This Is America", ("Hip Hop", "Gospel"), "Childish Gambino", "2018-05-05"),
-        ("Happy", ("Pop", "Soul"), "Pharrell Williams", "2013-11-21"),
-        ("We Are Never Ever Getting Back Together", ("Pop", "Country Pop"), "Taylor Swift", "2012-08-13"),
-        ("Royals", ("Indie Pop", "Electropop"), "Lorde", "2013-03-08"),
-        ("Counting Stars", ("Pop Rock", "Folk Pop"), "OneRepublic", "2013-06-14"),
-        ("Despacito", ("Reggaeton", "Latin Pop"), "Luis Fonsi", "2017-01-13"),
-        ("Blinding Lights", ("Synthwave", "Pop"), "The Weeknd", "2019-11-29"),
-        ("Drivers License", ("Pop", "Indie Pop"), "Olivia Rodrigo", "2021-01-08")
-        ]
-        not_added = load_single_songs(mydb, singles)
-        print(not_added)
-        artists = get_most_prolific_individual_artists(mydb, (2018, 2020))
-        print(artists)
-        artists = get_artists_last_single_in_year(mydb, 2018)
-        print(artists)
-        
-    except Error as e:
-        print(e)
+    pass
     
 
 if __name__ == "__main__":
