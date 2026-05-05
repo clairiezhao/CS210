@@ -111,17 +111,21 @@ def get_most_prolific_individual_artists(mydb, n: int, year_range: Tuple[int,int
         If there are no artists, an empty list is returned.
     """
     cursor = mydb.cursor()
-    query = '''select artist.name, count(*) as songs from song
-    join artist on song.artist_id = artist.id
-    where song.album_id is null
-    and year(song.release_date) between (%s) and (%s)
-    group by artist.id, artist.name
-    order by songs DESC, artist.name asc
-    limit (%s)'''
+    top_artists = []
+    query = '''
+    SELECT artist.name, COUNT(*) AS songs
+    FROM song
+    JOIN artist ON song.artist_id = artist.id
+    WHERE song.album_id IS NULL
+    AND YEAR(song.release_date) BETWEEN %s AND %s
+    GROUP BY artist.id, artist.name
+    ORDER BY songs DESC, artist.name ASC
+    LIMIT %s'''
     cursor.execute(query, (year_range[0], year_range[1], n))
     res = cursor.fetchall()
-    cursor.close()
-    return res
+    for row in res:
+        top_artists.append(row)
+    return top_artists
 
 
 def get_artists_last_single_in_year(mydb, year: int) -> Set[str]:
@@ -138,12 +142,12 @@ def get_artists_last_single_in_year(mydb, year: int) -> Set[str]:
     """
     cursor = mydb.cursor()
     top_artists = set()
-    query = '''select name, count(*) as songs from artist, song
-    where song.album_id is null
-    and year(release_date) = (%s)
-    and song.artist_id = artist.id
-    group by artist.id
-    order by artist.id desc'''
+    query = '''SELECT a.name
+    FROM artist a
+    JOIN song s ON s.artist_id = a.id
+    WHERE s.album_id IS NULL
+    GROUP BY a.id, a.name
+    HAVING MAX(YEAR(s.release_date)) = %s'''
     cursor.execute(query, (year,))
     res = cursor.fetchall()
     for row in res:
@@ -217,6 +221,7 @@ def load_albums(mydb, albums: List[Tuple[str,str,str,str,List[str]]]) -> Set[Tup
 
             album_id = cursor.lastrowid
 
+            # Check if each song exists
             # Insert each song related to the album
             for song_title in song_titles:
                 cursor.execute(
@@ -234,8 +239,12 @@ def load_albums(mydb, albums: List[Tuple[str,str,str,str,List[str]]]) -> Set[Tup
                         "INSERT INTO song_genre(song_id, genre_id) VALUES(%s, %s)",
                         (song_id, genre_id)
                     )
+                else:
+                    already_exists.add((album_title, artist_name))
+                    mydb.rollback()
+                    break
+        mydb.commit()
 
-    mydb.commit()
     cursor.close()
     return already_exists
 
