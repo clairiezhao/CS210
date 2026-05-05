@@ -111,19 +111,17 @@ def get_most_prolific_individual_artists(mydb, n: int, year_range: Tuple[int,int
         If there are no artists, an empty list is returned.
     """
     cursor = mydb.cursor()
-    top_artists = set()
-    query = '''select name, count(*) as songs from artist, song
+    query = '''select artist.name, count(*) as songs from song
+    join artist on song.artist_id = artist.id
     where song.album_id is null
-    and year(release_date) between (%s) and (%s)
-    and song.artist_id = artist.id
-    group by artist.id
-    order by count(*) desc
+    and year(song.release_date) between (%s) and (%s)
+    group by artist.id, artist.name
+    order by songs DESC, artist.name asc
     limit (%s)'''
     cursor.execute(query, (year_range[0], year_range[1], n))
     res = cursor.fetchall()
-    for row in res:
-        top_artists.add(row)
-    return top_artists
+    cursor.close()
+    return res
 
 
 def get_artists_last_single_in_year(mydb, year: int) -> Set[str]:
